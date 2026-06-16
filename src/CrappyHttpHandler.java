@@ -2,6 +2,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Instant;
 
 /**
  *
@@ -22,11 +23,18 @@ import java.io.OutputStream;
 public class CrappyHttpHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        String response = "umm..it worked.";
-        exchange.sendResponseHeaders(200, response.length());
+        StringBuffer response = new StringBuffer();
+        response.append("exchange.getResponseCode() = ").append(exchange.getResponseCode()).append("\r\n");
+        response.append("exchange.getRequestMethod() = ").append(exchange.getRequestMethod()).append("\r\n");
+        response.append("exchange.getLocalAddress() = ").append(exchange.getLocalAddress()).append("\r\n");
+        response.append("exchange.getRemoteAddress() = ").append(exchange.getRemoteAddress()).append("\r\n");
+        response.append("exchange.getRequestURI() = ").append(exchange.getRequestURI()).append("\r\n");
+        response.append("exchange.getProtocol() = ").append(exchange.getProtocol()).append("\r\n");
+        response.append("exchange.getResponseHeaders() = ").append(exchange.getResponseHeaders()).append("\r\n");
+        exchange.sendResponseHeaders(200, response.length()); // set Content-Length header, set status as 200
         OutputStream outputStream = exchange.getResponseBody();
-        outputStream.write(response.getBytes());
+        outputStream.write(String.valueOf(response).getBytes());
         outputStream.close();
-        System.out.println("just responded...");
+        System.out.println("just responded...current time : " + Instant.now());
     }
 }
