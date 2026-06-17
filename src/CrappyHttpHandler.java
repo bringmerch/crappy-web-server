@@ -23,14 +23,30 @@ import java.time.Instant;
 public class CrappyHttpHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        StringBuffer response = new StringBuffer();
-        response.append("exchange.getResponseCode() = ").append(exchange.getResponseCode()).append("\r\n");
-        response.append("exchange.getRequestMethod() = ").append(exchange.getRequestMethod()).append("\r\n");
-        response.append("exchange.getLocalAddress() = ").append(exchange.getLocalAddress()).append("\r\n");
-        response.append("exchange.getRemoteAddress() = ").append(exchange.getRemoteAddress()).append("\r\n");
-        response.append("exchange.getRequestURI() = ").append(exchange.getRequestURI()).append("\r\n");
-        response.append("exchange.getProtocol() = ").append(exchange.getProtocol()).append("\r\n");
-        response.append("exchange.getResponseHeaders() = ").append(exchange.getResponseHeaders()).append("\r\n");
+        StringBuilder response = new StringBuilder();
+        response
+            .append("""
+                <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Purple Background Example</title>
+                        <style>
+                            body {
+                                background-color: purple;
+                                color: white; /* Makes text easier to read on a dark background */
+                                font-family: sans-serif;
+                                padding: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>roger that.</h1>
+                    </body>
+                    </html>
+            """);
+        exchange.getResponseHeaders().set("Content-Type", "text/html");
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff"); // 브라우저의 MIME 추측 금지
         exchange.sendResponseHeaders(200, response.length()); // set Content-Length header, set status as 200
         OutputStream outputStream = exchange.getResponseBody();
         outputStream.write(String.valueOf(response).getBytes());
