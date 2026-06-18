@@ -2,6 +2,7 @@
 //import java.io.OutputStream;
 //import java.io.InputStream;
 //import java.net.SocketAddress;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import com.sun.net.httpserver.HttpServer;
 //import com.sun.net.httpserver.HttpExchange;
@@ -25,7 +26,7 @@ import com.sun.net.httpserver.HttpServer;
  * 2026-06-15        munke                   최초개정
  */
 public class Main {
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException {
         System.out.println("program started...");
         CrappyHttpHandler crappyHttpHandler = new CrappyHttpHandler();
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(8080), 0);

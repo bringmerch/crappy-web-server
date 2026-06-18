@@ -2,7 +2,10 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.InputStream;
 import java.time.Instant;
+import java.lang.Object;
+import org.apache.commons.lang3.ObjectUtils;
 
 /**
  *
@@ -24,6 +27,13 @@ public class CrappyHttpHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String method = exchange.getRequestMethod();
+        String contentType = ObjectUtils.getIfNull(exchange.getRequestHeaders().getFirst("Content-Type"), "application/json");
+        // todo: chunk 여부 파악
+        String transferEncoding = exchange.getRequestHeaders().getFirst("Transfer-Encoding");
+
+        // process body
+
+
         StringBuilder response = new StringBuilder();
 
         switch(method.toUpperCase()) {
