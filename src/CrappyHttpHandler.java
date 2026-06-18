@@ -23,7 +23,38 @@ import java.time.Instant;
 public class CrappyHttpHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        String method = exchange.getRequestMethod();
         StringBuilder response = new StringBuilder();
+
+        switch(method.toUpperCase()) {
+            case "GET":
+                processGetRequest();
+                break;
+            case "POST":
+                processPostRequest();
+                break;
+            case "PUT":
+                processPutRequest();
+                break;
+            case "PATCH":
+                processPatchRequest();
+                break;
+            case "DELETE":
+                processDeleteRequest();
+                break;
+            case "OPTION":
+                processOptionRequest();
+                break;
+            case "HEAD":
+                processHeadRequest();
+                break;
+            case "TRACE":
+                processTraceRequest();
+                break;
+            default:
+                break;
+        }
+
         response
             .append("""
                 <!DOCTYPE html>
@@ -52,5 +83,29 @@ public class CrappyHttpHandler implements HttpHandler {
         outputStream.write(String.valueOf(response).getBytes());
         outputStream.close();
         System.out.println("just responded...current time : " + Instant.now());
+    }
+
+    public void processGetRequest() {
+    }
+
+    public void processPostRequest() {
+    }
+
+    public void processPutRequest() {
+    }
+
+    public void processPatchRequest() {
+    }
+
+    public void processDeleteRequest() {
+    }
+
+    public void processOptionRequest() {
+    }
+
+    public void processHeadRequest() {
+    }
+
+    public void processTraceRequest() {
     }
 }
