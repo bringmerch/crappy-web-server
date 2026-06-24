@@ -1,26 +1,29 @@
+// The core build script detailing dependencies and plugins
 plugins {
     id 'java'
+    id 'application'
 }
 
-group 'gh.bringmerch.crappy'
-version '1.0-SNAPSHOT'
+group = 'bringmerch.crappy'
+version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
 }
+
 sourceSets {
     main {
         java {
-            srcDirs = ['src']
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
         }
     }
 }
+
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    implementation("org.apache.commons:commons-lang3:3.20.0")
-}
-
-test {
-    useJUnitPlatform()
+    implementation 'org.apache.commons:commons-lang3:3.20.0'
 }
