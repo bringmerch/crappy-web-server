@@ -4,7 +4,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
-
 /**
  *
  * Package Name:
@@ -21,9 +20,8 @@ import java.nio.charset.StandardCharsets;
  * 2026-06-15        munke                   최초개정
  */
 public class CrappyWebServer {
-    // todo: nio 기반으로 변경 (event driven like nginx, io(X) nio(O))
-    // todo: was 모듈에서 response 받으면 클라이언트에게 응답 전송
-    // todo: was로부터 응답받아서 클라이언트에게 전달
+    // todo: nio 기반으로 변경
+    // todo: was한테 응답받아서 클라이언트에게 전달
     // todo: clientSocket 닫기 (5초 내 요청없으면 닫히는지 확인/ was로부터 응답없으면 닫기) -> connection 헤더 같이 보삼
     // todo: request headedr status WAS에서 준 걸로 세팅
     // todo: path에 따라 WAS acceptor(?) 호출 - 서블릿컨테이너가 아니라 nginx가 도메인에 따라 넘기는거
@@ -32,6 +30,8 @@ public class CrappyWebServer {
     // todo: 톰캣이 받을 수 있는 양식으로 요청 문자열 빌딩해서 web server -> was로 flush하기 !!
     // todo: backend에서 8888로부터 오는 것만 받기 (inbound 제한
     // todo: connection keep-alive에 따라 클라이언트 소켓 close() 안 하고 듣고 있기 & 타임아웃
+    // todo: chunked encoding 받기
+    // todo: client close 안하고 connection: keep-alive 고려, 5초간 더 연결 지속 (현재 handle 끝나면 clientSocket close하고 있음)
 
     private static final int BACKEND_PORT = 9999;
     private static final String BACKEND_HOST = "127.0.0.1";
@@ -44,19 +44,19 @@ public class CrappyWebServer {
             while(!serverSocket.isClosed()) {
                 System.out.println("listening started on port 8888...");
                 // accept() : 대기하다가 요청 수신 시 backlog queue에서 연결 꺼내서 새로운 Socket 객체 반환
-                try (Socket clientSocket = serverSocket.accept()) {
+                Socket clientSocket = serverSocket.accept();
 //                    clientSocket.setSoTimeout(10000); // 10초동안 입력 없으면 SocketTimeoutException 발생
                     // 요청별로 쓰레드 & 클라이언트소켓 생성
                     new Thread(() -> {
                         try {
-                            forwardRequest(clientSocket);
+                            handleRequest(clientSocket);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
                     }).start();
-                } catch (IOException e) {
-                    System.out.println("accept() failed...");
-                }
+//                } catch (IOException e) {
+//                    System.out.println("accept() failed...");
+//                }
 //                } catch(SocketTimeoutException e) {
 //                    System.out.println("SocketTimeoutException occurred...");
 //                } catch(IOException e) {
@@ -73,28 +73,29 @@ public class CrappyWebServer {
             System.out.println("ServerSocket creation failed: " + e.getMessage());
         }
     }
-    public static void forwardRequest(Socket clientSocket) throws IOException {
+
+    public static void handleRequest(Socket clientSocket) throws IOException {
         try (
             Socket backendSocket = new Socket(BACKEND_HOST, BACKEND_PORT);
             BufferedReader clientBufferedReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
             BufferedWriter clientBufferedWriter = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
-            BufferedInputStream clientBufferedInputStream = new BufferedInputStream(clientSocket.getInputStream());
             BufferedWriter backendBufferedWriter = new BufferedWriter(new OutputStreamWriter(backendSocket.getOutputStream(), StandardCharsets.UTF_8)); // backend랑 연결된 buffered output stream
-            BufferedReader backendBufferedReader = new BufferedReader(new InputStreamReader(backendSocket.getInputStream(), StandardCharsets.UTF_8)); // backend랑 연결된 buffered input stream
-            BufferedInputStream backendBufferedInputStream = new BufferedInputStream(backendSocket.getInputStream())
+            BufferedReader backendBufferedReader = new BufferedReader(new InputStreamReader(backendSocket.getInputStream(), StandardCharsets.UTF_8)) // backend랑 연결된 buffered input stream
         ) {
             // backend로 요청 포워딩
-            backendBufferedWriter.write(readRequest(clientBufferedReader, clientBufferedInputStream));
+            backendBufferedWriter.write(readRequest(clientBufferedReader));
             backendBufferedWriter.flush();
             // client한테 backend로부터 온 응답 전달
-            clientBufferedWriter.write(readResponse(backendBufferedReader, backendBufferedInputStream));
+            clientBufferedWriter.write(readResponse(backendBufferedReader));
             clientBufferedWriter.flush();
         } catch (IOException e) {
-            System.out.println("forwardRequest.getMessage() = " + e.getMessage());
+            System.out.println("handleRequest.getMessage() = " + e.getMessage());
+        } finally {
+            clientSocket.close();
         }
     }
 
-    private static String readRequest(BufferedReader clientBufferedReader, BufferedInputStream clientBufferedInputStream) throws IOException {
+    private static String readRequest(BufferedReader clientBufferedReader) throws IOException {
         // 클라이언트 http request message 파싱
         StringBuilder requestMessage = new StringBuilder();
         String requestLine;
@@ -112,19 +113,19 @@ public class CrappyWebServer {
         requestMessage
             .append(requestStartLineParts[0])
             .append(" ")
-            .append("/backend")
-            .append(requestStartLineParts[1])
+            .append("/backend/work")
             .append(" ")
             .append(requestStartLineParts[2])
             .append(NEW_LINE);
         // 2. 헤더
-        // 비정상 http 메시지 - 헤더가 없어도 http message 끝에는 blank line 필요
-        if (clientBufferedReader.readLine() == null) {
-            throw new IOException("Missing blank line after http request startLine.");
-        }
         while (true) {
+            requestLine = clientBufferedReader.readLine();
+            // 빈 줄 만나기 전에 EOF 나오면 정상적으로 온 메시지가 아님
+            if (requestLine == null) {
+                throw new EOFException("Unexpected EOF while reading http request headers.");
+            }
             // 빈 줄 만나면 헤더 끝
-            if ((requestLine = clientBufferedReader.readLine()).isBlank())
+            if (requestLine.isBlank())
                 break;
             // Host 헤더는 Backend Host로 변경할 것이므로 pass
             if (requestLine.toLowerCase().startsWith("host"))
@@ -148,26 +149,18 @@ public class CrappyWebServer {
         requestMessage.append(NEW_LINE);
         // 3. 바디
         // 바디있는지 판단 = chunked false, content-length 0 이상
-        byte[] bodyBytes = new byte[contentLength];
-        int totalBytesRead = 0; // 총 읽은 바이트 수
         if (!transferEncodingChunked && contentLength > 0) {
-            // content-length로 온 만큼만 읽는다.
-            while(totalBytesRead < contentLength) {
-                int bytesRead = clientBufferedInputStream.read(bodyBytes, totalBytesRead, contentLength - totalBytesRead);
-                if (bytesRead == -1) {
-                    throw new IOException("Unexpected end of stream.");
-                }
-                totalBytesRead += bytesRead;
-            }
+            char[] body = new char[contentLength];
+            clientBufferedReader.read(body, 0, contentLength);
             requestMessage
-                .append(new String(bodyBytes, 0, totalBytesRead, StandardCharsets.UTF_8))
+                .append(new String(body))
                 .append(NEW_LINE);
         }
         System.out.println("requestMessage = " + requestMessage);
         return requestMessage.toString();
     }
 
-    private static String readResponse(BufferedReader backendBufferedReader, BufferedInputStream backendBufferedInputStream) throws IOException {
+    private static String readResponse(BufferedReader backendBufferedReader) throws IOException {
         // backend http response message 파싱
         StringBuilder responseMessage = new StringBuilder();
         String responseLine;
@@ -179,7 +172,7 @@ public class CrappyWebServer {
             throw new IOException("Empty http response startLine.");
         }
         String[] responseStartLineParts = responseStartLine.split(" ", 3);
-        if (responseStartLine.length() != 3 && responseStartLine.length() != 2) {
+        if (responseStartLineParts.length != 3 && responseStartLineParts.length != 2) {
             throw new IllegalArgumentException("Invalid HTTP Response Start Line.");
         }
         responseMessage
@@ -188,13 +181,14 @@ public class CrappyWebServer {
             .append(responseStartLineParts[1])
             .append(NEW_LINE); // reason phrase(status code 설명)는 생략
         // 2. 헤더
-        // 비정상 http 메시지 - 헤더가 없어도 http message 끝에는 blank line 필요
-        if (backendBufferedReader.readLine() == null) {
-            throw new IOException("Missing blank line after http response startLine.");
-        }
         while (true) {
+            responseLine = backendBufferedReader.readLine();
+            // 빈 줄 만나기 전에 EOF 나오면 정상적으로 온 메시지가 아님
+            if (responseLine == null) {
+                throw new EOFException("Unexpected EOF while reading http response headers.");
+            }
             // 빈 줄 만나면 헤더 끝
-            if ((responseLine = backendBufferedReader.readLine()).isBlank())
+            if (responseLine.isBlank())
                 break;
             // body framing을 위해 content-length 저장
             if (!transferEncodingChunked && responseLine.toLowerCase().startsWith("content-length"))
@@ -210,19 +204,11 @@ public class CrappyWebServer {
         responseMessage.append(NEW_LINE);
         // 3. 바디
         // 바디 있는지 판단 = chunked false, content-length 0 이상
-        byte[] bodyBytes = new byte[contentLength];
-        int totalBytesRead = 0; // 총 읽은 바이트 수
         if (!transferEncodingChunked && contentLength > 0) {
-            // content-length로 온 만큼만 읽는다.
-            while(totalBytesRead < contentLength) {
-                int bytesRead = backendBufferedInputStream.read(bodyBytes, totalBytesRead, contentLength - totalBytesRead);
-                if (bytesRead == -1) {
-                    throw new IOException("Unexpected end of stream.");
-                }
-                totalBytesRead += bytesRead;
-            }
+            char[] body = new char[contentLength];
+            backendBufferedReader.read(body, 0, contentLength);
             responseMessage
-                .append(new String(bodyBytes, 0, totalBytesRead, StandardCharsets.UTF_8))
+                .append(new String(body))
                 .append(NEW_LINE);
         }
         System.out.println("responseMessage = " + responseMessage);
