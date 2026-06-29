@@ -20,15 +20,12 @@ import java.nio.charset.StandardCharsets;
  * 2026-06-15        munke                   최초개정
  */
 public class CrappyWebServer {
-    // todo: nio 기반으로 변경
-    // todo: was한테 응답받아서 클라이언트에게 전달
-    // todo: clientSocket 닫기 (5초 내 요청없으면 닫히는지 확인/ was로부터 응답없으면 닫기) -> connection 헤더 같이 보삼
+    // todo: nio 기반으로 변경 (이벤트루프 기반)
     // todo: request headedr status WAS에서 준 걸로 세팅
     // todo: path에 따라 WAS acceptor(?) 호출 - 서블릿컨테이너가 아니라 nginx가 도메인에 따라 넘기는거
     // todo: fileReader로 파일넘기기
     // todo: client socket 시간지나면 죽이기 (timeout) & Execution Service pool에서 꺼내는 걸로 바꾸기
-    // todo: 톰캣이 받을 수 있는 양식으로 요청 문자열 빌딩해서 web server -> was로 flush하기 !!
-    // todo: backend에서 8888로부터 오는 것만 받기 (inbound 제한
+    // todo: backend에서 8888로부터 오는 것만 받기 (inbound 제한)
     // todo: connection keep-alive에 따라 클라이언트 소켓 close() 안 하고 듣고 있기 & 타임아웃
     // todo: chunked encoding 받기
     // todo: client close 안하고 connection: keep-alive 고려, 5초간 더 연결 지속 (현재 handle 끝나면 clientSocket close하고 있음)
@@ -45,7 +42,7 @@ public class CrappyWebServer {
                 System.out.println("listening started on port 8888...");
                 // accept() : 대기하다가 요청 수신 시 backlog queue에서 연결 꺼내서 새로운 Socket 객체 반환
                 Socket clientSocket = serverSocket.accept();
-//                    clientSocket.setSoTimeout(10000); // 10초동안 입력 없으면 SocketTimeoutException 발생
+                    clientSocket.setSoTimeout(10000); // 10초동안 입력 없으면 SocketTimeoutException 발생
                     // 요청별로 쓰레드 & 클라이언트소켓 생성
                     new Thread(() -> {
                         try {
@@ -54,18 +51,6 @@ public class CrappyWebServer {
                             throw new RuntimeException(e);
                         }
                     }).start();
-//                } catch (IOException e) {
-//                    System.out.println("accept() failed...");
-//                }
-//                } catch(SocketTimeoutException e) {
-//                    System.out.println("SocketTimeoutException occurred...");
-//                } catch(IOException e) {
-//                    if (serverSocket.isClosed()) {
-//                        System.out.println("serverSocket is closed...");
-//                        System.out.println("accept() failed...");
-//                        break;
-//                    }
-//                }
             }
         } catch(SocketTimeoutException e) {
             System.out.println("SocketTimeoutException occurred...");
