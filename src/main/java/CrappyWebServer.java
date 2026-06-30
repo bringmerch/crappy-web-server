@@ -4,6 +4,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+
 /**
  *
  * Package Name:
@@ -32,7 +33,7 @@ public class CrappyWebServer {
 
     private static final int BACKEND_PORT = 9999;
     private static final String BACKEND_HOST = "127.0.0.1";
-    private static final String NEW_LINE = System.lineSeparator();
+    private static final String CRLF = "\r\n";
 
     public static void main(String[] args) {
         System.out.println("program started...");
@@ -95,13 +96,17 @@ public class CrappyWebServer {
         if (requestStartLineParts.length != 3) {
             throw new IllegalArgumentException("Invalid HTTP Request Start Line.");
         }
+        String method = requestStartLineParts[0];
+        String path = requestStartLineParts[1];
+
         requestMessage
             .append(requestStartLineParts[0])
             .append(" ")
-            .append("/backend/work")
+            .append("/backend")
+            .append(path)
             .append(" ")
             .append(requestStartLineParts[2])
-            .append(NEW_LINE);
+            .append(CRLF);
         // 2. 헤더
         while (true) {
             requestLine = clientBufferedReader.readLine();
@@ -123,15 +128,15 @@ public class CrappyWebServer {
                 transferEncodingChunked = requestLine.split(":")[1].trim().equalsIgnoreCase("chunked");
             requestMessage
                 .append(requestLine)
-                .append(NEW_LINE);
+                .append(CRLF);
         }
         // Host 헤더는 Backend Host로 변경
         requestMessage
             .append("Host: ")
             .append(BACKEND_HOST)
-            .append(NEW_LINE);
+            .append(CRLF);
         // 헤더 끝을 의미하는 개행 (헤더 없어도, 마지막에 개행 필요)
-        requestMessage.append(NEW_LINE);
+        requestMessage.append(CRLF);
         // 3. 바디
         // 바디있는지 판단 = chunked false, content-length 0 이상
         if (!transferEncodingChunked && contentLength > 0) {
@@ -139,7 +144,7 @@ public class CrappyWebServer {
             clientBufferedReader.read(body, 0, contentLength);
             requestMessage
                 .append(new String(body))
-                .append(NEW_LINE);
+                .append(CRLF);
         }
         System.out.println("requestMessage = " + requestMessage);
         return requestMessage.toString();
@@ -164,7 +169,7 @@ public class CrappyWebServer {
             .append(responseStartLineParts[0])
             .append(" ")
             .append(responseStartLineParts[1])
-            .append(NEW_LINE); // reason phrase(status code 설명)는 생략
+            .append(CRLF); // reason phrase(status code 설명)는 생략
         // 2. 헤더
         while (true) {
             responseLine = backendBufferedReader.readLine();
@@ -183,10 +188,10 @@ public class CrappyWebServer {
                 transferEncodingChunked = responseLine.split(":")[1].trim().equalsIgnoreCase("chunked");
             responseMessage
                 .append(responseLine)
-                .append(NEW_LINE);
+                .append(CRLF);
         }
         // 헤더 끝을 의미하는 개행 (헤더 없어도, 마지막에 개행 필요)
-        responseMessage.append(NEW_LINE);
+        responseMessage.append(CRLF);
         // 3. 바디
         // 바디 있는지 판단 = chunked false, content-length 0 이상
         if (!transferEncodingChunked && contentLength > 0) {
@@ -194,7 +199,7 @@ public class CrappyWebServer {
             backendBufferedReader.read(body, 0, contentLength);
             responseMessage
                 .append(new String(body))
-                .append(NEW_LINE);
+                .append(CRLF);
         }
         System.out.println("responseMessage = " + responseMessage);
         return responseMessage.toString();
